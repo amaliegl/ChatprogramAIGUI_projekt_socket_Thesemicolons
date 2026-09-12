@@ -22,12 +22,14 @@ public class TcpServer {
 
                 System.out.println("Klient forbundet: " + clientSocket.getRemoteSocketAddress());
 
+                String currentUser = "";
                 String clientMessage = reader.readLine();
                 try {
                     Message message = Protocol.parse(clientMessage);
                     System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
                     switch (message.getType().toUpperCase()) {
                         case "LOGIN":
+                            currentUser = message.getTarget();
                             System.out.println("Handling LOGIN: target=" + message.getTarget());
                             break;
                         case "TEXT":
@@ -44,7 +46,8 @@ public class TcpServer {
                 }
 
                 // Send server-formatted message: TIMESTAMP|TYPE|SENDER|TARGET|PAYLOAD
-                ServerMessage serverMsg = new ServerMessage(null, "ACK", "server", "", "Connected to chat server");
+                String sender = (currentUser == null || currentUser.isEmpty()) ? "server" : currentUser;
+                ServerMessage serverMsg = new ServerMessage(null, "ACK", sender, "", "Connected to chat server");
                 String formatted = Protocol.formatServerMessage(serverMsg);
                 writer.println(formatted);
                 System.out.println("Bekræftelse sendt til klienten: " + formatted);

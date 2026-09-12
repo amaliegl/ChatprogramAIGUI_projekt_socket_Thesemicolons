@@ -14,27 +14,31 @@ public class TcpClient {
     private static final int PORT = 5000;
 
     public static void main(String[] args) throws IOException {
-        System.out.println("Forbinder til " + HOST + ":" + PORT);
+            BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+            System.out.print("Indtast brugernavn: ");
+            String username = consoleReader.readLine();
 
-        try (Socket socket = new Socket(HOST, PORT);
-             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
+            System.out.println("Forbinder til " + HOST + ":" + PORT);
 
-            System.out.println("Forbindelsen er oprettet");
+            try (Socket socket = new Socket(HOST, PORT);
+                 BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+                 PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
 
-            // Eksempelkommando i format TYPE|TARGET|PAYLOAD
-            writer.println("LOGIN|user1|");
-            String response = reader.readLine();
-            if (response != null) {
-               System.out.println("Serverbesked: " + response);
+                System.out.println("Forbindelsen er oprettet");
+
+                // Send LOGIN med brugernavn
+                writer.println("LOGIN|" + username + "|");
+                String response = reader.readLine();
+                if (response != null) {
+                   System.out.println("Serverbesked: " + response);
+                }
+
+            } catch (ConnectException exception) {
+                System.err.println("Kunne ikke forbinde");
+            } catch (IOException exception) {
+                System.err.println("Klientfejl: " + exception.getMessage());
             }
-
-        } catch (ConnectException exception) {
-            System.err.println("Kunne ikke forbinde");
-        } catch (IOException exception) {
-            System.err.println("Klientfejl: " + exception.getMessage());
         }
-    }
 }
 
 
