@@ -43,8 +43,11 @@ public class TcpServer {
                     System.out.println("Ugyldig besked fra klient: " + e.getMessage());
                 }
 
-                writer.println("Connected to chat server");
-                System.out.println("Bekræftelse sendt til klienten");
+                // Send server-formatted message: TIMESTAMP|TYPE|SENDER|TARGET|PAYLOAD
+                ServerMessage serverMsg = new ServerMessage(null, "ACK", "server", "", "Connected to chat server");
+                String formatted = Protocol.formatServerMessage(serverMsg);
+                writer.println(formatted);
+                System.out.println("Bekræftelse sendt til klienten: " + formatted);
 
             }
         } catch (IOException e) {
