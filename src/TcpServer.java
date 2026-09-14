@@ -23,8 +23,24 @@ public class TcpServer {
                 System.out.println("Klient forbundet: " + clientSocket.getRemoteSocketAddress());
 
                 String clientMessage = reader.readLine();
-                if (clientMessage != null) {
-                    System.out.println("Modtaget fra klient: " + clientMessage);
+                try {
+                    Message message = Protocol.parse(clientMessage);
+                    System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
+                    switch (message.getType().toUpperCase()) {
+                        case "LOGIN":
+                            System.out.println("Handling LOGIN: target=" + message.getTarget());
+                            break;
+                        case "TEXT":
+                            System.out.println("Handling TEXT: payload=" + message.getPayload());
+                            break;
+                        case "QUIT":
+                            System.out.println("Handling QUIT");
+                            break;
+                        default:
+                            System.out.println("Ukendt kommando: " + message.getType());
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.out.println("Ugyldig besked fra klient: " + e.getMessage());
                 }
 
                 writer.println("Connected to chat server");
