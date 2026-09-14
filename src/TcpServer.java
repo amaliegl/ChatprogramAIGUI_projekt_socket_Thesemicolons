@@ -46,8 +46,7 @@ public class TcpServer {
                 }
 
                 // Send server-formatted message: TIMESTAMP|TYPE|SENDER|TARGET|PAYLOAD
-                String sender = (currentUser == null || currentUser.isEmpty()) ? "server" : currentUser;
-                ServerMessage serverMsg = new ServerMessage(null, "ACK", sender, "", "Connected to chat server");
+                ServerMessage serverMsg = new ServerMessage(null, "ACK", "server", "", "Connected to chat server");
                 String formatted = Protocol.formatServerMessage(serverMsg);
                 writer.println(formatted);
                 System.out.println("Bekræftelse sendt til klienten: " + formatted);
