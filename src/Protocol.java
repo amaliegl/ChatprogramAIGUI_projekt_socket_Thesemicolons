@@ -1,4 +1,7 @@
+import java.time.Instant;
+
 public class Protocol {
+    // Client-side parse: TYPE|TARGET|PAYLOAD
     public static Message parse(String line) {
         if (line == null || line.trim().isEmpty()) {
             throw new IllegalArgumentException("Empty message");
