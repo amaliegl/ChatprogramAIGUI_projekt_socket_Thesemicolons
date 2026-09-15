@@ -5,12 +5,8 @@ public class ClientRegistry {
     private final Set<String> users = ConcurrentHashMap.newKeySet();
 
     public boolean registerUser(String username) {
-        if (username == null) {
-            return false;
-        }
-
-        String normalized = username.trim();
-        if (normalized.isEmpty()) {
+        String normalized = normalizeUsername(username);
+        if (normalized == null) {
             return false;
         }
 
@@ -18,14 +14,28 @@ public class ClientRegistry {
     }
 
     public boolean containsUser(String username) {
-        if (username == null) {
+        String normalized = normalizeUsername(username);
+        if (normalized == null) {
             return false;
         }
 
-        return users.contains(username.trim());
+        return users.contains(normalized);
     }
 
     public Set<String> getUsers() {
         return Set.copyOf(users);
+    }
+
+    private String normalizeUsername(String username) {
+        if (username == null) {
+            return null;
+        }
+
+        String normalized = username.trim();
+        if (normalized.isEmpty()) {
+            return null;
+        }
+
+        return normalized.toLowerCase();
     }
 }

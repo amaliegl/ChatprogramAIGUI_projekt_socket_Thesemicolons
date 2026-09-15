@@ -41,47 +41,72 @@ public class TcpServer {
                     break;
                 }
 
-                try {
-                    Message message = Protocol.parse(clientMessage);
-                    System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
+               boolean shouldExit = false;
 
-                    switch (message.getType().toUpperCase()) {
-                        case "LOGIN":
-                            currentUser = message.getTarget();
-                            boolean registered = clientRegistry.registerUser(currentUser);
-                            if (registered) {
-                                System.out.println("Bruger logget ind: " + currentUser);
-                                System.out.println("Aktive brugere: " + clientRegistry.getUsers());
-                            } else {
-                                System.out.println("Brugernavnet er allerede registreret: " + currentUser);
-                            }
-                            break;
-                        case "TEXT":
-                            System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
-                            break;
-                        case "QUIT":
-                            System.out.println("Handling QUIT");
-                            break;
-                        default:
-                            System.out.println("Ukendt kommando: " + message.getType());
-                    }
-                } catch (IllegalArgumentException e) {
-                    System.out.println("Ugyldig besked fra klient: " + e.getMessage());
-                }
+               try {
+                   Message message = Protocol.parse(clientMessage);
+                   System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
 
-                String ackSender = currentUser == null || currentUser.isBlank() ? "server" : currentUser;
-                ServerMessage serverMessage = new ServerMessage(null, "ACK", ackSender, "", "Connected to chat server");
-                String formattedReply = Protocol.formatServerMessage(serverMessage);
-                writer.println(formattedReply);
-                System.out.println("Bekræftelse sendt til klienten: " + formattedReply);
+                   switch (message.getType().toUpperCase()) {
+                       case "LOGIN":
+                           String requestedUser = message.getTarget();
+                           if (requestedUser == null || requestedUser.isBlank()) {
+                               sendServerReply(writer, "ERROR", "server", "", "brugernavn optaget");
+                               break;
+                           }
 
-                if ("QUIT".equalsIgnoreCase(Protocol.parse(clientMessage).getType())) {
-                    break;
-                }
+                           // Brugernavnet skal være unikt, så vi afviser login, hvis navnet allerede er aktivt.
+                           if (clientRegistry.containsUser(requestedUser)) {
+                               System.out.println("Brugernavnet er allerede registreret: " + requestedUser);
+                               currentUser = "";
+                               sendServerReply(writer, "ERROR", "server", "", "brugernavn optaget");
+                               break;
+                           }
+
+                           currentUser = requestedUser;
+                           boolean registered = clientRegistry.registerUser(currentUser);
+                           if (registered) {
+                               System.out.println("Bruger logget ind: " + currentUser);
+                               System.out.println("Aktive brugere: " + clientRegistry.getUsers());
+                               sendServerReply(writer, "ACK", currentUser, "", "Brugernavn godkendt");
+                           } else {
+                               System.out.println("Brugernavnet kunne ikke registreres: " + currentUser);
+                               currentUser = "";
+                               sendServerReply(writer, "ERROR", "server", "", "brugernavn optaget");
+                           }
+                           break;
+                       case "TEXT":
+                           System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
+                           sendServerReply(writer, "ACK", currentUser, message.getTarget(), "Besked modtaget");
+                           break;
+                       case "QUIT":
+                           System.out.println("Handling QUIT");
+                           sendServerReply(writer, "ACK", currentUser, "", "Du er logget ud");
+                           shouldExit = true;
+                           break;
+                       default:
+                           System.out.println("Ukendt kommando: " + message.getType());
+                           sendServerReply(writer, "ERROR", "server", "", "Ukendt kommando");
+                   }
+               } catch (IllegalArgumentException e) {
+                   System.out.println("Ugyldig besked fra klient: " + e.getMessage());
+                   sendServerReply(writer, "ERROR", "server", "", "Ugyldig besked");
+               }
+
+               if (shouldExit) {
+                   break;
+               }
             }
         } catch (IOException e) {
             System.err.println("Fejl i klientforbindelse: " + e.getMessage());
         }
+    }
+
+    private static void sendServerReply(PrintWriter writer, String type, String sender, String target, String payload) {
+        ServerMessage serverMessage = new ServerMessage(null, type, sender, target, payload);
+        String formattedReply = Protocol.formatServerMessage(serverMessage);
+        writer.println(formattedReply);
+        System.out.println("Svar sendt til klienten: " + formattedReply);
     }
 
     private static int readPort(String[] args) {
