@@ -7,42 +7,93 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 public class TcpClient {
-    /*private static final String HOST = "87.57.243.106";
-    private static final int PORT = 42722;*/
-
     private static final String HOST = "localhost";
     private static final int PORT = 5000;
 
     public static void main(String[] args) throws IOException {
-            BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-            System.out.print("Indtast brugernavn: ");
-            String username = consoleReader.readLine();
+        BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
+        System.out.print("Indtast brugernavn: ");
+        String username = consoleReader.readLine();
 
-            System.out.println("Forbinder til " + HOST + ":" + PORT);
+        if (username == null || username.isBlank()) {
+            System.out.println("Brugernavnet kan ikke være tomt.");
+            return;
+        }
 
-            try (Socket socket = new Socket(HOST, PORT);
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-                 PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
+        System.out.println("Forbinder til " + HOST + ":" + PORT);
 
-                System.out.println("Forbindelsen er oprettet");
+        try (Socket socket = new Socket(HOST, PORT);
+             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
 
-                // Send LOGIN med brugernavn
-                writer.println("LOGIN|" + username + "|");
-                String response = reader.readLine();
-                if (response != null) {
-                   System.out.println("Serverbesked: " + response);
-                }
-            // Eksempelkommando i format TYPE|TARGET|PAYLOAD
-            writer.println("LOGIN|user1|");
+            System.out.println("Forbindelsen er oprettet");
+            writer.println("LOGIN|" + username + "|");
+
             String response = reader.readLine();
             if (response != null) {
-               System.out.println("Serverbesked: " + response);
+                System.out.println("Serverbesked: " + response);
             }
 
-            } catch (ConnectException exception) {
-                System.err.println("Kunne ikke forbinde");
-            } catch (IOException exception) {
-                System.err.println("Klientfejl: " + exception.getMessage());
+            while (true) {
+                printMenu();
+                String input = consoleReader.readLine();
+                int choice = parseMenuChoice(input);
+
+                if (choice == 3) {
+                    writer.println("QUIT||");
+                    System.out.println("Du er logget ud.");
+                    String quitResponse = reader.readLine();
+                    if (quitResponse != null) {
+                        System.out.println("Serverbesked: " + quitResponse);
+                    }
+                    break;
+                }
+
+                if (choice == 1 || choice == 2) {
+                    System.out.print("Indtast mål: ");
+                    String target = consoleReader.readLine();
+                    System.out.print("Skriv besked: ");
+                    String payload = consoleReader.readLine();
+
+                    String protocolMessage = buildProtocolMessage(choice, target, payload);
+                    writer.println(protocolMessage);
+
+                    String serverResponse = reader.readLine();
+                    if (serverResponse != null) {
+                        System.out.println("Serverbesked: " + serverResponse);
+                    }
+                    continue;
+                }
+
+                System.out.println("Ugyldigt valg. Prøv igen.");
             }
+        } catch (ConnectException exception) {
+            System.err.println("Kunne ikke forbinde");
+        } catch (IOException exception) {
+            System.err.println("Klientfejl: " + exception.getMessage());
         }
+    }
+
+    private static void printMenu() {
+        System.out.println();
+        System.out.println("Menu:");
+        System.out.println("1. Send privat chatbesked");
+        System.out.println("2. Send fællesbesked til chatrum");
+        System.out.println("3. Log ud");
+        System.out.print("Vælg en handling: ");
+    }
+
+    private static int parseMenuChoice(String input) {
+        try {
+            return Integer.parseInt(input.trim());
+        } catch (Exception e) {
+            return -1;
+        }
+    }
+
+    private static String buildProtocolMessage(int choice, String target, String payload) {
+        String safeTarget = target == null ? "" : target.trim();
+        String safePayload = payload == null ? "" : payload.trim();
+        return "TEXT|" + safeTarget + "|" + safePayload;
+    }
 }
