@@ -49,69 +49,75 @@ public class TcpServer {
                     break;
                 }
 
-               boolean shouldExit = false;
+                boolean shouldExit = false;
 
-               try {
-                   Message message = Protocol.parse(clientMessage);
-                   System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
+                try {
+                    Message message = Protocol.parse(clientMessage);
+                    System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
 
-                   switch (message.getType().toUpperCase()) {
-                       case "LOGIN":
-                           String requestedUser = message.getTarget();
-                           if (requestedUser == null || requestedUser.isBlank()) {
-                               sendServerReply(writer, "ERROR", "server", "", "brugernavn optaget");
-                               break;
-                           }
+                    switch (message.getType().toUpperCase()) {
+                        case "LOGIN":
+                            String requestedUser = message.getTarget();
+                            if (requestedUser == null || requestedUser.isBlank()) {
+                                // Return target as what client attempted (empty string if none)
+                                String targetForError = requestedUser == null ? "" : requestedUser;
+                                sendServerReply(writer, "ERROR", "server", targetForError, "brugernavn optaget");
+                                break;
+                            }
 
-                           // Brugernavnet skal være unikt, så vi afviser login, hvis navnet allerede er aktivt.
-                           if (clientRegistry.containsUser(requestedUser)) {
-                               System.out.println("Brugernavnet er allerede registreret: " + requestedUser);
-                               currentUser = "";
-                               sendServerReply(writer, "ERROR", "server", "", "brugernavn optaget");
-                               break;
-                           }
+                            // Brugernavnet skal være unikt, så vi afviser login, hvis navnet allerede er aktivt.
+                            if (clientRegistry.containsUser(requestedUser)) {
+                                System.out.println("Brugernavnet er allerede registreret: " + requestedUser);
+                                currentUser = "";
+                                sendServerReply(writer, "ERROR", "server", requestedUser, "brugernavn optaget");
+                                break;
+                            }
 
-                           currentUser = requestedUser;
-                           boolean registered = clientRegistry.registerUser(currentUser);
-                           if (registered) {
-                               System.out.println("Bruger logget ind: " + currentUser);
-                               System.out.println("Aktive brugere: " + clientRegistry.getUsers());
-                               sendServerReply(writer, "ACK", currentUser, "", "Brugernavn godkendt");
-                           } else {
-                               System.out.println("Brugernavnet kunne ikke registreres: " + currentUser);
-                               currentUser = "";
-                               sendServerReply(writer, "ERROR", "server", "", "brugernavn optaget");
-                           }
-                           break;
-                       case "TEXT":
-                           System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
-                           sendServerReply(writer, "ACK", currentUser, message.getTarget(), "Besked modtaget");
-                           break;
-                       case "QUIT":
-                           System.out.println("Handling QUIT");
-                           // Fjern brugeren fra registry ved eksplicit logout
-                           if (currentUser != null && !currentUser.isBlank()) {
-                               boolean removed = clientRegistry.unregisterUser(currentUser);
-                               if (removed) {
-                                   System.out.println("Bruger fjernet ved logout: " + currentUser);
-                                   System.out.println("Aktive brugere: " + clientRegistry.getUsers());
-                               }
-                           }
-                           sendServerReply(writer, "ACK", currentUser, "", "Du er logget ud");
-                           shouldExit = true;
-                           break;
-                       default:
-                           System.out.println("Ukendt kommando: " + message.getType());
-                           sendServerReply(writer, "ERROR", "server", "", "Ukendt kommando");
-                   }
-               } catch (IllegalArgumentException e) {
-                   System.out.println("Ugyldig besked fra klient: " + e.getMessage());
-                   sendServerReply(writer, "ERROR", "server", "", "Ugyldig besked");
-               }
+                            currentUser = requestedUser;
+                            boolean registered = clientRegistry.registerUser(currentUser);
+                            if (registered) {
+                                System.out.println("Bruger logget ind: " + currentUser);
+                                System.out.println("Aktive brugere: " + clientRegistry.getUsers());
+                                sendServerReply(writer, "ACK", currentUser, "", "Brugernavn godkendt");
+                            } else {
+                                System.out.println("Brugernavnet kunne ikke registreres: " + currentUser);
+                                String targetForError = currentUser == null ? "" : currentUser;
+                                currentUser = "";
+                                sendServerReply(writer, "ERROR", "server", targetForError, "brugernavn optaget");
+                            }
+                            break;
+                        case "TEXT":
+                            System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
+                            sendServerReply(writer, "ACK", currentUser, message.getTarget(), "Besked modtaget");
+                            break;
+                        case "QUIT":
+                            System.out.println("Handling QUIT");
+                            // Fjern brugeren fra registry ved eksplicit logout
+                            if (currentUser != null && !currentUser.isBlank()) {
+                                boolean removed = clientRegistry.unregisterUser(currentUser);
+                                if (removed) {
+                                    System.out.println("Bruger fjernet ved logout: " + currentUser);
+                                    System.out.println("Aktive brugere: " + clientRegistry.getUsers());
+                                }
+                            }
+                            sendServerReply(writer, "ACK", currentUser, "", "Du er logget ud");
+                            shouldExit = true;
+                            break;
+                        default:
+                            System.out.println("Ukendt kommando: " + message.getType());
+                            // Use message target as TARGET in ERROR
+                            sendServerReply(writer, "ERROR", "server", message.getTarget(), "Ukendt kommando");
+                    }
+                } catch (IllegalArgumentException e) {
+                    System.out.println("Ugyldig besked fra klient: " + e.getMessage());
+                    // If client already has a name, use it as TARGET; otherwise leave blank
+                    String targetForError = (currentUser != null && !currentUser.isBlank()) ? currentUser : "";
+                    sendServerReply(writer, "ERROR", "server", targetForError, "Ugyldig besked");
+                }
 
-               if (shouldExit) {
-                   break;
-               }
+                if (shouldExit) {
+                    break;
+                }
             }
         } catch (IOException e) {
             System.err.println("Fejl i klientforbindelse: " + e.getMessage());
