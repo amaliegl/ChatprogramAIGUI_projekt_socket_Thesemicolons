@@ -11,29 +11,53 @@ public class TcpServer {
 
     public static void main(String[] args) {
         int port = readPort(args);
-        System.out.println("Starter server på port " + port);
+        ClientRegistry clientRegistry = new ClientRegistry();
 
         try (ServerSocket serverSocket = new ServerSocket(port)) {
-            System.out.println("Serveren venter på en klient.");
+            System.out.println("Starter server på port " + port);
+            System.out.println("Serveren venter på klienter.");
 
-            try (Socket clientSocket = serverSocket.accept();
-                 BufferedReader reader = new BufferedReader(new InputStreamReader(clientSocket.getInputStream(), StandardCharsets.UTF_8));
-                 PrintWriter writer = new PrintWriter(clientSocket.getOutputStream(), true, StandardCharsets.UTF_8)) {
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                Thread handler = new Thread(() -> handleClient(clientSocket, clientRegistry));
+                handler.start();
+            }
+        } catch (IOException e) {
+            System.err.println("Serverfejl: " + e.getMessage());
+        }
+    }
 
-                System.out.println("Klient forbundet: " + clientSocket.getRemoteSocketAddress());
+    private static void handleClient(Socket clientSocket, ClientRegistry clientRegistry) {
+        try (Socket socket = clientSocket;
+             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
+             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
 
-                String currentUser = "";
+            System.out.println("Klient forbundet: " + socket.getRemoteSocketAddress());
+            String currentUser = "";
+
+            while (true) {
                 String clientMessage = reader.readLine();
+                if (clientMessage == null) {
+                    break;
+                }
+
                 try {
                     Message message = Protocol.parse(clientMessage);
                     System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
+
                     switch (message.getType().toUpperCase()) {
                         case "LOGIN":
                             currentUser = message.getTarget();
-                            System.out.println("Handling LOGIN: target=" + message.getTarget());
+                            boolean registered = clientRegistry.registerUser(currentUser);
+                            if (registered) {
+                                System.out.println("Bruger logget ind: " + currentUser);
+                                System.out.println("Aktive brugere: " + clientRegistry.getUsers());
+                            } else {
+                                System.out.println("Brugernavnet er allerede registreret: " + currentUser);
+                            }
                             break;
                         case "TEXT":
-                            System.out.println("Handling TEXT: payload=" + message.getPayload());
+                            System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
                             break;
                         case "QUIT":
                             System.out.println("Handling QUIT");
@@ -45,23 +69,26 @@ public class TcpServer {
                     System.out.println("Ugyldig besked fra klient: " + e.getMessage());
                 }
 
-                // Send server-formatted message: TIMESTAMP|TYPE|SENDER|TARGET|PAYLOAD
-                ServerMessage serverMsg = new ServerMessage(null, "ACK", "server", "", "Connected to chat server");
-                String formatted = Protocol.formatServerMessage(serverMsg);
-                writer.println(formatted);
-                System.out.println("Bekræftelse sendt til klienten: " + formatted);
+                String ackSender = currentUser == null || currentUser.isBlank() ? "server" : currentUser;
+                ServerMessage serverMessage = new ServerMessage(null, "ACK", ackSender, "", "Connected to chat server");
+                String formattedReply = Protocol.formatServerMessage(serverMessage);
+                writer.println(formattedReply);
+                System.out.println("Bekræftelse sendt til klienten: " + formattedReply);
 
+                if ("QUIT".equalsIgnoreCase(Protocol.parse(clientMessage).getType())) {
+                    break;
+                }
             }
         } catch (IOException e) {
-            System.err.println("Serverfejl: " + e.getMessage());
+            System.err.println("Fejl i klientforbindelse: " + e.getMessage());
         }
-        System.out.println("Serveren er stoppet.");
     }
 
     private static int readPort(String[] args) {
         if (args.length == 0) {
             return DEFAULT_PORT;
         }
+
         try {
             return Integer.parseInt(args[0]);
         } catch (NumberFormatException exception) {
