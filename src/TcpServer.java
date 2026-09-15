@@ -38,6 +38,14 @@ public class TcpServer {
             while (true) {
                 String clientMessage = reader.readLine();
                 if (clientMessage == null) {
+                    // Forbindelsen er brudt — fjern bruger fra registry hvis sat
+                    if (currentUser != null && !currentUser.isBlank()) {
+                        boolean removed = clientRegistry.unregisterUser(currentUser);
+                        if (removed) {
+                            System.out.println("Bruger fjernet pga. forbindelse lukket: " + currentUser);
+                            System.out.println("Aktive brugere: " + clientRegistry.getUsers());
+                        }
+                    }
                     break;
                 }
 
@@ -81,6 +89,14 @@ public class TcpServer {
                            break;
                        case "QUIT":
                            System.out.println("Handling QUIT");
+                           // Fjern brugeren fra registry ved eksplicit logout
+                           if (currentUser != null && !currentUser.isBlank()) {
+                               boolean removed = clientRegistry.unregisterUser(currentUser);
+                               if (removed) {
+                                   System.out.println("Bruger fjernet ved logout: " + currentUser);
+                                   System.out.println("Aktive brugere: " + clientRegistry.getUsers());
+                               }
+                           }
                            sendServerReply(writer, "ACK", currentUser, "", "Du er logget ud");
                            shouldExit = true;
                            break;
