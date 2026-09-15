@@ -34,6 +34,8 @@ public class TcpServer {
 
             System.out.println("Klient forbundet: " + socket.getRemoteSocketAddress());
             String currentUser = "";
+            // Initialize the "alle" chatroom for broadcasting to all users
+            Chatroom alleChatroom = new Chatroom("alle", clientRegistry);
 
             while (true) {
                 String clientMessage = reader.readLine();
@@ -88,7 +90,24 @@ public class TcpServer {
                             break;
                         case "TEXT":
                             System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
-                            sendServerReply(writer, "ACK", currentUser, message.getTarget(), "Besked modtaget");
+                            String target = message.getTarget();
+
+                            // Check if target is "alle" (broadcast to all users)
+                            if (target != null && target.equalsIgnoreCase("alle")) {
+                                boolean broadcastSuccess = alleChatroom.broadcastMessage(currentUser, message.getPayload());
+                                if (broadcastSuccess) {
+                                    // Acknowledge successful broadcast
+                                    sendServerReply(writer, "ACK", currentUser, "alle", "Besked sendt til alle");
+                                    System.out.println("Broadcast sendt fra " + currentUser + " til alle brugere");
+                                } else {
+                                    // Chatroom is empty (only sender online)
+                                    sendServerReply(writer, "ERROR", "server", currentUser, "Det valgte chatrum er tomt");
+                                    System.out.println("Broadcast fra " + currentUser + " fejlede: chatroom er tomt");
+                                }
+                            } else {
+                                // Future: handle other chatroom targets
+                                sendServerReply(writer, "ACK", currentUser, target, "Besked modtaget");
+                            }
                             break;
                         case "PRIVAT":
                             System.out.println("Handling PRIVAT: target=" + message.getTarget() + ", payload=" + message.getPayload());

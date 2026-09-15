@@ -1,4 +1,5 @@
 import java.io.PrintWriter;
+import java.util.Collection;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -38,6 +39,15 @@ public class ClientRegistry {
 
     public Set<String> getUsers() {
         return Set.copyOf(clients.keySet());
+    }
+
+    /**
+     * Get all PrintWriters for active clients, useful for broadcasting messages.
+     *
+     * @return Collection of PrintWriters for all connected clients
+     */
+    public Collection<PrintWriter> getAllWriters() {
+        return clients.values();
     }
 
     public boolean unregisterUser(String username) {
