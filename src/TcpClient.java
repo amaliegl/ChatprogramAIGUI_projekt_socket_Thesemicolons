@@ -12,13 +12,6 @@ public class TcpClient {
 
     public static void main(String[] args) throws IOException {
         BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
-        System.out.print("Indtast brugernavn: ");
-        String username = consoleReader.readLine();
-
-        if (username == null || username.isBlank()) {
-            System.out.println("Brugernavnet kan ikke være tomt.");
-            return;
-        }
 
         System.out.println("Forbinder til " + HOST + ":" + PORT);
 
@@ -27,45 +20,74 @@ public class TcpClient {
              PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
 
             System.out.println("Forbindelsen er oprettet");
-            writer.println("LOGIN|" + username + "|");
 
-            String response = reader.readLine();
-            if (response != null) {
-                System.out.println("Serverbesked: " + response);
+            boolean loggedIn = false;
+            // Brugeren skal få en ny chance, så længe serveren afviser det valgte brugernavn.
+            while (!loggedIn) {
+               System.out.print("Indtast brugernavn: ");
+               String username = consoleReader.readLine();
+
+               if (username == null || username.isBlank()) {
+                   System.out.println("Brugernavnet kan ikke være tomt.");
+                   continue;
+               }
+
+               writer.println("LOGIN|" + username + "|");
+               String response = reader.readLine();
+
+               if (response == null) {
+                   System.out.println("Serveren lukkede forbindelsen.");
+                   return;
+               }
+
+               ServerMessage serverMessage = Protocol.parseServer(response);
+               String payload = serverMessage.getPayload();
+               String type = serverMessage.getType();
+
+               System.out.println("Serverbesked: " + response);
+
+               if ("ERROR".equalsIgnoreCase(type) && "brugernavn optaget".equalsIgnoreCase(payload)) {
+                   System.out.println("Brugernavnet er optaget. Prøv igen.");
+                   continue;
+               }
+
+               if ("ACK".equalsIgnoreCase(type)) {
+                   loggedIn = true;
+               }
             }
 
             while (true) {
-                printMenu();
-                String input = consoleReader.readLine();
-                int choice = parseMenuChoice(input);
+               printMenu();
+               String input = consoleReader.readLine();
+               int choice = parseMenuChoice(input);
 
-                if (choice == 3) {
-                    writer.println("QUIT||");
-                    System.out.println("Du er logget ud.");
-                    String quitResponse = reader.readLine();
-                    if (quitResponse != null) {
-                        System.out.println("Serverbesked: " + quitResponse);
-                    }
-                    break;
-                }
+               if (choice == 3) {
+                   writer.println("QUIT||");
+                   System.out.println("Du er logget ud.");
+                   String quitResponse = reader.readLine();
+                   if (quitResponse != null) {
+                       System.out.println("Serverbesked: " + quitResponse);
+                   }
+                   break;
+               }
 
-                if (choice == 1 || choice == 2) {
-                    System.out.print("Indtast mål: ");
-                    String target = consoleReader.readLine();
-                    System.out.print("Skriv besked: ");
-                    String payload = consoleReader.readLine();
+               if (choice == 1 || choice == 2) {
+                   System.out.print("Indtast mål: ");
+                   String target = consoleReader.readLine();
+                   System.out.print("Skriv besked: ");
+                   String payload = consoleReader.readLine();
 
-                    String protocolMessage = buildProtocolMessage(choice, target, payload);
-                    writer.println(protocolMessage);
+                   String protocolMessage = buildProtocolMessage(choice, target, payload);
+                   writer.println(protocolMessage);
 
-                    String serverResponse = reader.readLine();
-                    if (serverResponse != null) {
-                        System.out.println("Serverbesked: " + serverResponse);
-                    }
-                    continue;
-                }
+                   String serverResponse = reader.readLine();
+                   if (serverResponse != null) {
+                       System.out.println("Serverbesked: " + serverResponse);
+                   }
+                   continue;
+               }
 
-                System.out.println("Ugyldigt valg. Prøv igen.");
+               System.out.println("Ugyldigt valg. Prøv igen.");
             }
         } catch (ConnectException exception) {
             System.err.println("Kunne ikke forbinde");
