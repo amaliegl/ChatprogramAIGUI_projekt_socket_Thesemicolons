@@ -1,9 +1,8 @@
-import java.util.Collections;
-import java.util.HashSet;
 import java.util.Set;
+import java.util.concurrent.ConcurrentHashMap;
 
 public class ClientRegistry {
-    private final Set<String> users = new HashSet<>();
+    private final Set<String> users = ConcurrentHashMap.newKeySet();
 
     public boolean registerUser(String username) {
         if (username == null) {
@@ -27,6 +26,6 @@ public class ClientRegistry {
     }
 
     public Set<String> getUsers() {
-        return Collections.unmodifiableSet(new HashSet<>(users));
+        return Set.copyOf(users);
     }
 }
