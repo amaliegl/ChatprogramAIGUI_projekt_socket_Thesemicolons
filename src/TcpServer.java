@@ -19,8 +19,8 @@ public class TcpServer {
 
             while (true) {
                 Socket clientSocket = serverSocket.accept();
-                Thread handler = new Thread(() -> handleClient(clientSocket, clientRegistry));
-                handler.start();
+                Thread clientThread = new Thread(() -> handleClient(clientSocket, clientRegistry));
+                clientThread.start();
             }
         } catch (IOException e) {
             System.err.println("Serverfejl: " + e.getMessage());
