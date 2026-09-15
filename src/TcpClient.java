@@ -75,7 +75,7 @@ public class TcpClient {
                String input = consoleReader.readLine();
                int choice = parseMenuChoice(input);
 
-               if (choice == 3) {
+               if (choice == 5) {
                    writer.println("QUIT||");
                    System.out.println("Du er logget ud.");
                    // Let listener handle server responses (ACK). Close socket by exiting main's try-with-resources.
@@ -95,6 +95,32 @@ public class TcpClient {
                    continue;
                }
 
+               if (choice == 3) {
+                   // Create new chatroom
+                   System.out.print("Indtast navn på nyt chatrum: ");
+                   String roomName = consoleReader.readLine();
+                   if (roomName == null || roomName.isBlank()) {
+                       System.out.println("Chatrummets navn kan ikke være tomt.");
+                       continue;
+                   }
+                   writer.println("CREATE_ROOM|" + roomName + "|");
+                   // Response will be printed by listener thread
+                   continue;
+               }
+
+               if (choice == 4) {
+                   // Join existing chatroom
+                   System.out.print("Indtast navn på chatrum at joine: ");
+                   String roomName = consoleReader.readLine();
+                   if (roomName == null || roomName.isBlank()) {
+                       System.out.println("Chatrummets navn kan ikke være tomt.");
+                       continue;
+                   }
+                   writer.println("JOIN|" + roomName + "|");
+                   // Response will be printed by listener thread
+                   continue;
+               }
+
                System.out.println("Ugyldigt valg. Prøv igen.");
             }
         } catch (ConnectException exception) {
@@ -109,7 +135,9 @@ public class TcpClient {
         System.out.println("Menu:");
         System.out.println("1. Send privat chatbesked");
         System.out.println("2. Send fællesbesked til chatrum");
-        System.out.println("3. Log ud");
+        System.out.println("3. Opret nyt chatrum");
+        System.out.println("4. Joine eksisterende chatrum");
+        System.out.println("5. Log ud");
         System.out.print("Vælg en handling: ");
     }
 
