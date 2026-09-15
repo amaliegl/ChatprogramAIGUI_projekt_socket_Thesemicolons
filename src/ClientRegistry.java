@@ -1,16 +1,20 @@
+import java.io.PrintWriter;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
 
 public class ClientRegistry {
-    private final Set<String> users = ConcurrentHashMap.newKeySet();
+    // Map normalized username -> writer for that client's connection
+    private final Map<String, PrintWriter> clients = new ConcurrentHashMap<>();
 
-    public boolean registerUser(String username) {
+    // Register a user and associate a writer so server can send messages to that client
+    public boolean registerUser(String username, PrintWriter writer) {
         String normalized = normalizeUsername(username);
-        if (normalized == null) {
+        if (normalized == null || writer == null) {
             return false;
         }
 
-        return users.add(normalized);
+        return clients.putIfAbsent(normalized, writer) == null;
     }
 
     public boolean containsUser(String username) {
@@ -19,11 +23,21 @@ public class ClientRegistry {
             return false;
         }
 
-        return users.contains(normalized);
+        return clients.containsKey(normalized);
+    }
+
+    // Return the writer associated with a username, or null if not connected
+    public PrintWriter getWriter(String username) {
+        String normalized = normalizeUsername(username);
+        if (normalized == null) {
+            return null;
+        }
+
+        return clients.get(normalized);
     }
 
     public Set<String> getUsers() {
-        return Set.copyOf(users);
+        return Set.copyOf(clients.keySet());
     }
 
     public boolean unregisterUser(String username) {
@@ -32,7 +46,7 @@ public class ClientRegistry {
             return false;
         }
 
-        return users.remove(normalized);
+        return clients.remove(normalized) != null;
     }
 
     private String normalizeUsername(String username) {

@@ -8,7 +8,7 @@ import java.nio.charset.StandardCharsets;
 
 public class TcpClient {
     private static final String HOST = "localhost";
-    private static final int PORT = 5000;
+    private static final int PORT = 5001;
 
     public static void main(String[] args) throws IOException {
         BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));
@@ -56,6 +56,20 @@ public class TcpClient {
                }
             }
 
+            // Start a background listener thread to print any incoming server messages asynchronously
+            Thread listener = new Thread(() -> {
+                try {
+                    String incoming;
+                    while ((incoming = reader.readLine()) != null) {
+                        System.out.println("Serverbesked: " + incoming);
+                    }
+                } catch (IOException e) {
+                    // Listener ends when connection is closed
+                }
+            });
+            listener.setDaemon(true);
+            listener.start();
+
             while (true) {
                printMenu();
                String input = consoleReader.readLine();
@@ -64,10 +78,7 @@ public class TcpClient {
                if (choice == 3) {
                    writer.println("QUIT||");
                    System.out.println("Du er logget ud.");
-                   String quitResponse = reader.readLine();
-                   if (quitResponse != null) {
-                       System.out.println("Serverbesked: " + quitResponse);
-                   }
+                   // Let listener handle server responses (ACK). Close socket by exiting main's try-with-resources.
                    break;
                }
 
@@ -80,10 +91,7 @@ public class TcpClient {
                    String protocolMessage = buildProtocolMessage(choice, target, payload);
                    writer.println(protocolMessage);
 
-                   String serverResponse = reader.readLine();
-                   if (serverResponse != null) {
-                       System.out.println("Serverbesked: " + serverResponse);
-                   }
+                   // Responses (ACK or forwarded messages) will be printed by the listener thread.
                    continue;
                }
 
@@ -116,6 +124,9 @@ public class TcpClient {
     private static String buildProtocolMessage(int choice, String target, String payload) {
         String safeTarget = target == null ? "" : target.trim();
         String safePayload = payload == null ? "" : payload.trim();
+        if (choice == 1) {
+            return "PRIVAT|" + safeTarget + "|" + safePayload;
+        }
         return "TEXT|" + safeTarget + "|" + safePayload;
     }
 }

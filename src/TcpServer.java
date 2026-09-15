@@ -7,7 +7,7 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 public class TcpServer {
-    private static final int DEFAULT_PORT = 5000;
+    private static final int DEFAULT_PORT = 5001;
 
     public static void main(String[] args) {
         int port = readPort(args);
@@ -74,7 +74,7 @@ public class TcpServer {
                             }
 
                             currentUser = requestedUser;
-                            boolean registered = clientRegistry.registerUser(currentUser);
+                            boolean registered = clientRegistry.registerUser(currentUser, writer);
                             if (registered) {
                                 System.out.println("Bruger logget ind: " + currentUser);
                                 System.out.println("Aktive brugere: " + clientRegistry.getUsers());
@@ -89,6 +89,25 @@ public class TcpServer {
                         case "TEXT":
                             System.out.println("Handling TEXT: target=" + message.getTarget() + ", payload=" + message.getPayload());
                             sendServerReply(writer, "ACK", currentUser, message.getTarget(), "Besked modtaget");
+                            break;
+                        case "PRIVAT":
+                            System.out.println("Handling PRIVAT: target=" + message.getTarget() + ", payload=" + message.getPayload());
+                            String targetUser = message.getTarget();
+                            if (targetUser == null || targetUser.isBlank()) {
+                                sendServerReply(writer, "ERROR", "server", currentUser == null ? "" : currentUser, "Den valgte modtager er ikke online");
+                                break;
+                            }
+
+                            PrintWriter targetWriter = clientRegistry.getWriter(targetUser);
+                            if (targetWriter == null) {
+                                sendServerReply(writer, "ERROR", "server", currentUser == null ? "" : currentUser, "Den valgte modtager er ikke online");
+                            } else {
+                                // Forward the private message to the target client with sender set to currentUser
+                                ServerMessage forward = new ServerMessage(null, "PRIVAT", currentUser, targetUser, message.getPayload());
+                                targetWriter.println(Protocol.formatServerMessage(forward));
+                                // Acknowledge to sender
+                                sendServerReply(writer, "ACK", currentUser, targetUser, "Privat besked sendt");
+                            }
                             break;
                         case "QUIT":
                             System.out.println("Handling QUIT");
