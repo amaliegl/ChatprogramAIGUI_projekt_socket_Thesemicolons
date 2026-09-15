@@ -9,17 +9,9 @@ public class Message {
         this.payload = payload;
     }
 
-    public String getType() {
-        return type;
-    }
-
-    public String getTarget() {
-        return target;
-    }
-
-    public String getPayload() {
-        return payload;
-    }
+    public String getType() { return type; }
+    public String getTarget() { return target; }
+    public String getPayload() { return payload; }
 
     @Override
     public String toString() {
