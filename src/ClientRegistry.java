@@ -26,6 +26,15 @@ public class ClientRegistry {
         return Set.copyOf(users);
     }
 
+    public boolean unregisterUser(String username) {
+        String normalized = normalizeUsername(username);
+        if (normalized == null) {
+            return false;
+        }
+
+        return users.remove(normalized);
+    }
+
     private String normalizeUsername(String username) {
         if (username == null) {
             return null;
