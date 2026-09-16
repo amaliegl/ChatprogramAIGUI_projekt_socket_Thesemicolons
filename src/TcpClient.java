@@ -75,13 +75,15 @@ public class TcpClient {
                String input = consoleReader.readLine();
                int choice = parseMenuChoice(input);
 
-               if (choice == 5) {
+               // Quit (now option 6)
+               if (choice == 6) {
                    writer.println("QUIT||");
                    System.out.println("Du er logget ud.");
                    // Let listener handle server responses (ACK). Close socket by exiting main's try-with-resources.
                    break;
                }
 
+               // Send private or room text
                if (choice == 1 || choice == 2) {
                    System.out.print("Indtast mål: ");
                    String target = consoleReader.readLine();
@@ -121,6 +123,19 @@ public class TcpClient {
                    continue;
                }
 
+               if (choice == 5) {
+                   // Leave existing chatroom
+                   System.out.print("Indtast navn på chatrum at forlade: ");
+                   String roomName = consoleReader.readLine();
+                   if (roomName == null || roomName.isBlank()) {
+                       System.out.println("Chatrummets navn kan ikke være tomt.");
+                       continue;
+                   }
+                   writer.println("LEAVE|" + roomName + "|");
+                   // Response will be printed by listener thread
+                   continue;
+               }
+
                System.out.println("Ugyldigt valg. Prøv igen.");
             }
         } catch (ConnectException exception) {
@@ -137,7 +152,8 @@ public class TcpClient {
         System.out.println("2. Send fællesbesked til chatrum");
         System.out.println("3. Opret nyt chatrum");
         System.out.println("4. Joine eksisterende chatrum");
-        System.out.println("5. Log ud");
+        System.out.println("5. Forlad et chatrum");
+        System.out.println("6. Log ud");
         System.out.print("Vælg en handling: ");
     }
 
@@ -155,6 +171,7 @@ public class TcpClient {
         if (choice == 1) {
             return "PRIVAT|" + safeTarget + "|" + safePayload;
         }
+        // choice 2 -> TEXT to chatroom
         return "TEXT|" + safeTarget + "|" + safePayload;
     }
 }

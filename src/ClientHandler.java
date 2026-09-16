@@ -25,7 +25,7 @@ public class ClientHandler implements Runnable {
     @Override
     public void run() {
         String currentUser = "";
-        // Track which chatrooms this user has joined
+        // Track which chatrooms this user has joined (normalized lowercase names)
         Set<String> joinedChatrooms = ConcurrentHashMap.newKeySet();
 
         try (Socket s = this.socket;
@@ -74,6 +74,9 @@ public class ClientHandler implements Runnable {
                                 if (alleChatroom != null) {
                                     alleChatroom.addMember(currentUser, writer);
                                     joinedChatrooms.add("alle");
+                                    // Notify existing members that this user joined (exclude the new member)
+                                    ServerMessage joinNotif = new ServerMessage(null, "INFO", currentUser, "alle", currentUser + " har tilsluttet sig alle.");
+                                    alleChatroom.notifyMembersExcept(currentUser, joinNotif);
                                 }
                                 TcpServer.sendServerReply(writer, "LOGIN", currentUser, "", "Brugernavn godkendt");
                             } else {
@@ -111,9 +114,46 @@ public class ClientHandler implements Runnable {
                                 joinedChatrooms.add(joinRoomName.toLowerCase());
                                 System.out.println(currentUser + " joiner chatrum: " + joinRoomName);
                                 TcpServer.sendServerReply(writer, "JOIN_CHATRUM", "server", currentUser, "Du er nu medlem af '" + joinRoomName + "'");
+                                // Notify existing members (excluding the new member)
+                                ServerMessage joinNotif = new ServerMessage(null, "INFO", currentUser, joinRoomName, currentUser + " har tilsluttet sig " + joinRoomName + ".");
+                                joinRoom.notifyMembersExcept(currentUser, joinNotif);
                             } else {
                                 TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Du er allerede medlem af dette chatrum");
                             }
+                            break;
+                        case "LEAVE":
+                            String leaveRoomName = message.getTarget();
+                            if (leaveRoomName == null || leaveRoomName.isBlank()) {
+                                TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Chatrummets navn kan ikke være tomt");
+                                break;
+                            }
+                            if (!chatRoomManager.existsChatroom(leaveRoomName)) {
+                                TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Chatrum eksisterer ikke");
+                                break;
+                            }
+
+                            Chatroom leaveRoom = chatRoomManager.getChatroom(leaveRoomName);
+                            if (leaveRoom == null) {
+                                TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Chatrum eksisterer ikke");
+                                break;
+                            }
+
+                            // Check membership
+                            if (!leaveRoom.isMember(currentUser)) {
+                                TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Du kan ikke forlade " + leaveRoomName + ", da du ikke er medlem af det");
+                                break;
+                            }
+
+                            // Remove and notify remaining members atomically via chatroom helper
+                            boolean removed = leaveRoom.removeMemberWithNotify(currentUser);
+                            if (removed) {
+                                // Update client's joined set
+                                joinedChatrooms.remove(leaveRoomName.toLowerCase());
+                                TcpServer.sendServerReply(writer, "LEAVE_CHATRUM", "server", currentUser, "Du har forladt '" + leaveRoomName + "'");
+                            } else {
+                                TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Kunne ikke forlade chatrum");
+                            }
+
                             break;
                         case "TEXT":
                             String targetRoom = message.getTarget();

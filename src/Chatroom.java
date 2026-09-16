@@ -52,6 +52,41 @@ public class Chatroom {
     }
 
     /**
+     * Removes a user and notifies remaining members that the user left.
+     * Also sends a special message to the sole remaining member if exactly one remains.
+     *
+     * @param username the username leaving
+     * @return true if user was removed, false otherwise
+     */
+    public boolean removeMemberWithNotify(String username) {
+        String normalized = normalizeUsername(username);
+        if (normalized == null) return false;
+
+        boolean removed = members.remove(normalized) != null;
+        if (!removed) return false;
+
+        // Notify remaining members that this user has left
+        ServerMessage leaveNotice = new ServerMessage(null, "TEXT", username, name, username + " har forladt " + name + ".");
+        notifyMembersExcept(username, leaveNotice);
+
+        int remaining = getMemberCount();
+        if (remaining == 1) {
+            // Inform the remaining single member that they are alone
+            for (Map.Entry<String, PrintWriter> e : members.entrySet()) {
+                PrintWriter pw = e.getValue();
+                if (pw != null) {
+                    ServerMessage alone = new ServerMessage(null, "INFO", "server", name, "Du er nu den eneste tilbage i " + name + ".");
+                    synchronized (pw) {
+                        pw.println(Protocol.formatServerMessage(alone));
+                    }
+                }
+            }
+        }
+
+        return true;
+    }
+
+    /**
      * Checks if a user is a member of this chatroom.
      *
      * @param username the username to check
@@ -114,6 +149,27 @@ public class Chatroom {
         }
 
         return true;
+    }
+
+    /**
+     * Notify all members except the excluded username using the provided ServerMessage.
+     * This method will send the message even if only one member remains.
+     *
+     * @param excludeUsername username to exclude from notification (may be null)
+     * @param message the ServerMessage to send
+     */
+    public void notifyMembersExcept(String excludeUsername, ServerMessage message) {
+        if (message == null) return;
+        for (Map.Entry<String, PrintWriter> e : members.entrySet()) {
+            String member = e.getKey();
+            if (excludeUsername != null && member.equalsIgnoreCase(excludeUsername)) continue;
+            PrintWriter pw = e.getValue();
+            if (pw != null) {
+                synchronized (pw) {
+                    pw.println(Protocol.formatServerMessage(message));
+                }
+            }
+        }
     }
 
     /**
