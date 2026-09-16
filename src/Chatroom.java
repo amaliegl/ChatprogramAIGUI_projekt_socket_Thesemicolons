@@ -106,7 +106,10 @@ public class Chatroom {
                         name,
                         payload
                 );
-                targetWriter.println(Protocol.formatServerMessage(message));
+                // Synchronize on the PrintWriter to avoid interleaved writes from multiple threads
+                synchronized (targetWriter) {
+                    targetWriter.println(Protocol.formatServerMessage(message));
+                }
             }
         }
 

@@ -1,229 +1,96 @@
-import java.io.BufferedReader;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.io.PrintWriter;
 import java.net.ServerSocket;
 import java.net.Socket;
-import java.nio.charset.StandardCharsets;
-import java.util.Set;
-import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
+/**
+ * TcpServer now uses an ExecutorService to handle client connections via ClientHandler tasks.
+ * This keeps the accept-loop lightweight and allows controlled concurrency.
+ */
 public class TcpServer {
     private static final int DEFAULT_PORT = 5001;
+    private static final int DEFAULT_POOL_SIZE = 20; // configurable via env THREAD_POOL_SIZE
 
     public static void main(String[] args) {
         int port = readPort(args);
+        int poolSize = readPoolSize();
+
         ClientRegistry clientRegistry = new ClientRegistry();
         ChatRoomManager chatRoomManager = new ChatRoomManager();
 
-        // Create the default "alle" chatroom
+        // Ensure default chatroom exists
         chatRoomManager.createChatroom("alle");
 
-        try (ServerSocket serverSocket = new ServerSocket(port)) {
+        ExecutorService executor = Executors.newFixedThreadPool(poolSize);
+
+        ServerSocket serverSocket = null;
+        try {
+            serverSocket = new ServerSocket(port);
+            ServerSocket finalServerSocket = serverSocket; // for lambda
+
+            // Shutdown hook: close server socket and shutdown executor
+            Runtime.getRuntime().addShutdownHook(new Thread(() -> {
+                System.out.println("Shutdown initiated: closing server socket and executor");
+                try {
+                    finalServerSocket.close();
+                } catch (IOException e) {
+                    // ignore
+                }
+                executor.shutdown();
+                try {
+                    if (!executor.awaitTermination(5, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
+                    }
+                } catch (InterruptedException ex) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
+                }
+            }));
+
             System.out.println("Starter server på port " + port);
             System.out.println("Serveren venter på klienter.");
 
-            while (true) {
-                Socket clientSocket = serverSocket.accept();
-                Thread clientThread = new Thread(() -> handleClient(clientSocket, clientRegistry, chatRoomManager));
-                clientThread.start();
+            while (!serverSocket.isClosed()) {
+                try {
+                    Socket clientSocket = serverSocket.accept();
+                    // Submit a ClientHandler to the executor instead of creating a new Thread
+                    executor.submit(new ClientHandler(clientSocket, clientRegistry, chatRoomManager));
+                } catch (IOException e) {
+                    if (serverSocket.isClosed()) break;
+                    System.err.println("Fejl ved accept: " + e.getMessage());
+                }
             }
         } catch (IOException e) {
             System.err.println("Serverfejl: " + e.getMessage());
-        }
-    }
-
-    private static void handleClient(Socket clientSocket, ClientRegistry clientRegistry, ChatRoomManager chatRoomManager) {
-        try (Socket socket = clientSocket;
-             BufferedReader reader = new BufferedReader(new InputStreamReader(socket.getInputStream(), StandardCharsets.UTF_8));
-             PrintWriter writer = new PrintWriter(socket.getOutputStream(), true, StandardCharsets.UTF_8)) {
-
-            System.out.println("Klient forbundet: " + socket.getRemoteSocketAddress());
-            String currentUser = "";
-            // Track which chatrooms this user has joined
-            Set<String> joinedChatrooms = ConcurrentHashMap.newKeySet();
-
-            while (true) {
-                String clientMessage = reader.readLine();
-                if (clientMessage == null) {
-                    // Forbindelsen er brudt — fjern bruger fra registry og chatrooms hvis sat
-                    if (currentUser != null && !currentUser.isBlank()) {
-                        boolean removed = clientRegistry.unregisterUser(currentUser);
-                        if (removed) {
-                            System.out.println("Bruger fjernet pga. forbindelse lukket: " + currentUser);
-                            System.out.println("Aktive brugere: " + clientRegistry.getUsers());
-                        }
-                        // Remove user from all chatrooms
-                        for (String chatroomName : joinedChatrooms) {
-                            Chatroom room = chatRoomManager.getChatroom(chatroomName);
-                            if (room != null) {
-                                room.removeMember(currentUser);
-                            }
-                        }
-                    }
-                    break;
-                }
-
-                boolean shouldExit = false;
-
+        } finally {
+            if (executor != null) {
+                executor.shutdown();
                 try {
-                    Message message = Protocol.parse(clientMessage);
-                    System.out.println("Modtaget fra klient: " + clientMessage + " -> " + message);
-
-                    switch (message.getType().toUpperCase()) {
-                        case "LOGIN":
-                            String requestedUser = message.getTarget();
-                            if (requestedUser == null || requestedUser.isBlank()) {
-                                String targetForError = requestedUser == null ? "" : requestedUser;
-                                sendServerReply(writer, "ERROR", "server", targetForError, "brugernavn optaget");
-                                break;
-                            }
-
-                            if (clientRegistry.containsUser(requestedUser)) {
-                                System.out.println("Brugernavnet er allerede registreret: " + requestedUser);
-                                currentUser = "";
-                                sendServerReply(writer, "ERROR", "server", requestedUser, "brugernavn optaget");
-                                break;
-                            }
-
-                            currentUser = requestedUser;
-                            boolean registered = clientRegistry.registerUser(currentUser, writer);
-                            if (registered) {
-                                System.out.println("Bruger logget ind: " + currentUser);
-                                System.out.println("Aktive brugere: " + clientRegistry.getUsers());
-                                // Auto-join the "alle" chatroom
-                                Chatroom alleChatroom = chatRoomManager.getChatroom("alle");
-                                if (alleChatroom != null) {
-                                    alleChatroom.addMember(currentUser, writer);
-                                    joinedChatrooms.add("alle");
-                                }
-                                sendServerReply(writer, "ACK", currentUser, "", "Brugernavn godkendt");
-                            } else {
-                                System.out.println("Brugernavnet kunne ikke registreres: " + currentUser);
-                                String targetForError = currentUser == null ? "" : currentUser;
-                                currentUser = "";
-                                sendServerReply(writer, "ERROR", "server", targetForError, "brugernavn optaget");
-                            }
-                            break;
-                        case "CREATE_ROOM":
-                            // Format: CREATE_ROOM|roomname|
-                            String newRoomName = message.getTarget();
-                            if (newRoomName == null || newRoomName.isBlank()) {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Chatrummets navn kan ikke være tomt");
-                                break;
-                            }
-                            if (chatRoomManager.createChatroom(newRoomName)) {
-                                System.out.println("Chatrum oprettet: " + newRoomName);
-                                sendServerReply(writer, "ACK", "server", currentUser, "Chatrum '" + newRoomName + "' oprettet");
-                            } else {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Chatrum eksisterer allerede");
-                            }
-                            break;
-                        case "JOIN":
-                            // Format: JOIN|roomname|
-                            String joinRoomName = message.getTarget();
-                            if (joinRoomName == null || joinRoomName.isBlank()) {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Chatrummets navn kan ikke være tomt");
-                                break;
-                            }
-                            if (!chatRoomManager.existsChatroom(joinRoomName)) {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Chatrum eksisterer ikke");
-                                break;
-                            }
-                            Chatroom joinRoom = chatRoomManager.getChatroom(joinRoomName);
-                            if (joinRoom != null && joinRoom.addMember(currentUser, writer)) {
-                                joinedChatrooms.add(joinRoomName.toLowerCase());
-                                System.out.println(currentUser + " joiner chatrum: " + joinRoomName);
-                                sendServerReply(writer, "ACK", "server", currentUser, "Du er nu medlem af '" + joinRoomName + "'");
-                            } else {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Du er allerede medlem af dette chatrum");
-                            }
-                            break;
-                        case "TEXT":
-                            // Format: TEXT|roomname|payload
-                            String targetRoom = message.getTarget();
-                            if (targetRoom == null || targetRoom.isBlank()) {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Chatrummets navn kan ikke være tomt");
-                                break;
-                            }
-                            if (!chatRoomManager.existsChatroom(targetRoom)) {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Chatrum eksisterer ikke");
-                                break;
-                            }
-                            Chatroom textRoom = chatRoomManager.getChatroom(targetRoom);
-                            if (textRoom != null && !textRoom.isMember(currentUser)) {
-                                sendServerReply(writer, "ERROR", "server", currentUser, "Du er ikke medlem af dette chatrum");
-                                break;
-                            }
-                            if (textRoom != null) {
-                                boolean broadcastSuccess = textRoom.broadcastMessage(currentUser, message.getPayload());
-                                if (broadcastSuccess) {
-                                    sendServerReply(writer, "ACK", currentUser, targetRoom, "Besked sendt");
-                                    System.out.println("Besked sendt i chatrum '" + targetRoom + "' fra " + currentUser);
-                                } else {
-                                    sendServerReply(writer, "ERROR", "server", currentUser, "Det valgte chatrum er tomt");
-                                }
-                            }
-                            break;
-                        case "PRIVAT":
-                            System.out.println("Handling PRIVAT: target=" + message.getTarget() + ", payload=" + message.getPayload());
-                            String targetUser = message.getTarget();
-                            if (targetUser == null || targetUser.isBlank()) {
-                                sendServerReply(writer, "ERROR", "server", currentUser == null ? "" : currentUser, "Den valgte modtager er ikke online");
-                                break;
-                            }
-
-                            PrintWriter targetWriter = clientRegistry.getWriter(targetUser);
-                            if (targetWriter == null) {
-                                sendServerReply(writer, "ERROR", "server", currentUser == null ? "" : currentUser, "Den valgte modtager er ikke online");
-                            } else {
-                                ServerMessage forward = new ServerMessage(null, "PRIVAT", currentUser, targetUser, message.getPayload());
-                                targetWriter.println(Protocol.formatServerMessage(forward));
-                                sendServerReply(writer, "ACK", currentUser, targetUser, "Privat besked sendt");
-                            }
-                            break;
-                        case "QUIT":
-                            System.out.println("Handling QUIT");
-                            if (currentUser != null && !currentUser.isBlank()) {
-                                boolean removed = clientRegistry.unregisterUser(currentUser);
-                                if (removed) {
-                                    System.out.println("Bruger fjernet ved logout: " + currentUser);
-                                    System.out.println("Aktive brugere: " + clientRegistry.getUsers());
-                                }
-                                // Remove user from all chatrooms
-                                for (String chatroomName : joinedChatrooms) {
-                                    Chatroom room = chatRoomManager.getChatroom(chatroomName);
-                                    if (room != null) {
-                                        room.removeMember(currentUser);
-                                    }
-                                }
-                            }
-                            sendServerReply(writer, "ACK", currentUser, "", "Du er logget ud");
-                            shouldExit = true;
-                            break;
-                        default:
-                            System.out.println("Ukendt kommando: " + message.getType());
-                            sendServerReply(writer, "ERROR", "server", message.getTarget(), "Ukendt kommando");
+                    if (!executor.awaitTermination(3, TimeUnit.SECONDS)) {
+                        executor.shutdownNow();
                     }
-                } catch (IllegalArgumentException e) {
-                    System.out.println("Ugyldig besked fra klient: " + e.getMessage());
-                    String targetForError = (currentUser != null && !currentUser.isBlank()) ? currentUser : "";
-                    sendServerReply(writer, "ERROR", "server", targetForError, "Ugyldig besked");
-                }
-
-                if (shouldExit) {
-                    break;
+                } catch (InterruptedException ex) {
+                    executor.shutdownNow();
+                    Thread.currentThread().interrupt();
                 }
             }
-        } catch (IOException e) {
-            System.err.println("Fejl i klientforbindelse: " + e.getMessage());
+
+            if (serverSocket != null && !serverSocket.isClosed()) {
+                try { serverSocket.close(); } catch (IOException ignored) {}
+            }
         }
     }
 
-    private static void sendServerReply(PrintWriter writer, String type, String sender, String target, String payload) {
+    // Helper to send replies to a single client. Synchronize writes on writer to avoid interleaved output.
+    public static void sendServerReply(PrintWriter writer, String type, String sender, String target, String payload) {
         ServerMessage serverMessage = new ServerMessage(null, type, sender, target, payload);
         String formattedReply = Protocol.formatServerMessage(serverMessage);
-        writer.println(formattedReply);
+        synchronized (writer) {
+            writer.println(formattedReply);
+        }
         System.out.println("Svar sendt til klienten: " + formattedReply);
     }
 
@@ -238,5 +105,11 @@ public class TcpServer {
             System.err.println("Ugyldig port. Bruger standardport " + DEFAULT_PORT);
             return DEFAULT_PORT;
         }
+    }
+
+    private static int readPoolSize() {
+        String v = System.getenv("THREAD_POOL_SIZE");
+        if (v == null) return DEFAULT_POOL_SIZE;
+        try { return Integer.parseInt(v); } catch (NumberFormatException ex) { return DEFAULT_POOL_SIZE; }
     }
 }

@@ -1,6 +1,11 @@
 import java.time.Instant;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 public class Protocol {
+    private static final DateTimeFormatter timestampFormatter =
+            DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm");
+
     // Client-side format: TYPE|TARGET|PAYLOAD
     public static Message parse(String line) {
         if (line == null || line.trim().isEmpty()) {
@@ -26,26 +31,37 @@ public class Protocol {
         }
 
         String[] parts = line.split("\\|", 5);
-        String timestamp = parts.length > 0 ? parts[0].trim() : "";
+
+        String timestamp = parts.length > 0 ? parts[0].trim() : null;
         String type = parts.length > 1 ? parts[1].trim() : "";
         String sender = parts.length > 2 ? parts[2].trim() : "";
         String target = parts.length > 3 ? parts[3].trim() : "";
         String payload = parts.length > 4 ? parts[4].trim() : "";
 
-        if (timestamp.isEmpty() || type.isEmpty() || payload.isEmpty()) {
+        if (timestamp == null || type.isEmpty() || payload.isEmpty()) {
             throw new IllegalArgumentException("Server message missing required fields");
         }
 
-        return new ServerMessage(timestamp, type, sender, target, payload);
+        LocalDateTime parsedTimestamp = LocalDateTime.parse(timestamp, timestampFormatter);
+
+        return new ServerMessage(parsedTimestamp, type, sender, target, payload);
     }
 
     public static String formatServerMessage(ServerMessage message) {
-        String timestamp = message.getTimestamp();
+        /*String timestamp = message.getTimestamp();
         if (timestamp == null || timestamp.isBlank()) {
             timestamp = Instant.now().toString();
         }
 
         return new ServerMessage(timestamp, message.getType(), message.getSender(), message.getTarget(), message.getPayload())
+                .serialize();*/
+        LocalDateTime timestamp = message.getTimestamp();
+        if (timestamp == null) {
+            timestamp = LocalDateTime.now();
+        }
+
+        return new ServerMessage(timestamp, message.getType(), message.getSender(), message.getTarget(), message.getPayload())
                 .serialize();
+
     }
 }

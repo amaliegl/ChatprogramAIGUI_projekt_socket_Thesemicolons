@@ -44,14 +44,14 @@ public class TcpClient {
                String payload = serverMessage.getPayload();
                String type = serverMessage.getType();
 
-               System.out.println("Serverbesked: " + response);
+               System.out.println(response);
 
                if ("ERROR".equalsIgnoreCase(type) && "brugernavn optaget".equalsIgnoreCase(payload)) {
                    System.out.println("Brugernavnet er optaget. Prøv igen.");
                    continue;
                }
 
-               if ("ACK".equalsIgnoreCase(type)) {
+               if ("LOGIN".equalsIgnoreCase(type)) {
                    loggedIn = true;
                }
             }
@@ -61,7 +61,7 @@ public class TcpClient {
                 try {
                     String incoming;
                     while ((incoming = reader.readLine()) != null) {
-                        System.out.println("Serverbesked: " + incoming);
+                        System.out.println(incoming);
                     }
                 } catch (IOException e) {
                     // Listener ends when connection is closed
