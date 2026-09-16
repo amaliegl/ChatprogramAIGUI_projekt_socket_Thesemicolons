@@ -65,6 +65,14 @@ public class Chatroom {
         boolean removed = members.remove(normalized) != null;
         if (!removed) return false;
 
+        // Special-case: the "alle" chatroom is a global broadcast channel. Do not send
+        // leave/alone notifications for 'alle' to avoid noisy messages — its semantics
+        // are that clients implicitly are part of it while connected. For other chatrooms
+        // we still send notifications.
+        if (name.equalsIgnoreCase("alle")) {
+            return true;
+        }
+
         // Notify remaining members that this user has left
         ServerMessage leaveNotice = new ServerMessage(null, "TEXT", username, name, username + " har forladt " + name + ".");
         notifyMembersExcept(username, leaveNotice);

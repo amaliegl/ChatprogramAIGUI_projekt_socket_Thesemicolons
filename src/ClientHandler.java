@@ -74,9 +74,9 @@ public class ClientHandler implements Runnable {
                                 if (alleChatroom != null) {
                                     alleChatroom.addMember(currentUser, writer);
                                     joinedChatrooms.add("alle");
-                                    // Notify existing members that this user joined (exclude the new member)
-                                    ServerMessage joinNotif = new ServerMessage(null, "INFO", currentUser, "alle", currentUser + " har tilsluttet sig alle.");
-                                    alleChatroom.notifyMembersExcept(currentUser, joinNotif);
+                                        // Do NOT notify members about join/leave for 'alle' — it is a global
+                                        // broadcast channel and notifications would be noisy. Other chatrooms
+                                        // still receive join/leave notifications.
                                 }
                                 TcpServer.sendServerReply(writer, "LOGIN", currentUser, "", "Brugernavn godkendt");
                             } else {
@@ -114,9 +114,11 @@ public class ClientHandler implements Runnable {
                                 joinedChatrooms.add(joinRoomName.toLowerCase());
                                 System.out.println(currentUser + " joiner chatrum: " + joinRoomName);
                                 TcpServer.sendServerReply(writer, "JOIN_CHATRUM", "server", currentUser, "Du er nu medlem af '" + joinRoomName + "'");
-                                // Notify existing members (excluding the new member)
-                                ServerMessage joinNotif = new ServerMessage(null, "INFO", currentUser, joinRoomName, currentUser + " har tilsluttet sig " + joinRoomName + ".");
-                                joinRoom.notifyMembersExcept(currentUser, joinNotif);
+                                // Notify existing members (excluding the new member), except for 'alle'
+                                if (!joinRoom.getName().equalsIgnoreCase("alle")) {
+                                    ServerMessage joinNotif = new ServerMessage(null, "INFO", currentUser, joinRoomName, currentUser + " har tilsluttet sig " + joinRoomName + ".");
+                                    joinRoom.notifyMembersExcept(currentUser, joinNotif);
+                                }
                             } else {
                                 TcpServer.sendServerReply(writer, "ERROR", "server", currentUser, "Du er allerede medlem af dette chatrum");
                             }
@@ -223,16 +225,23 @@ public class ClientHandler implements Runnable {
 
     private void cleanupOnDisconnect(String currentUser, Set<String> joinedChatrooms) {
         if (currentUser != null && !currentUser.isBlank()) {
+            // First unregister user from global registry so no new private messages are routed to them
             boolean removed = clientRegistry.unregisterUser(currentUser);
             if (removed) {
                 System.out.println("Bruger fjernet ved disconnect: " + currentUser);
                 System.out.println("Aktive brugere: " + clientRegistry.getUsers());
             }
-            // Remove user from all chatrooms they joined
+
+            // Remove user from all chatrooms they joined and notify remaining members.
+            // Use Chatroom.removeMemberWithNotify which performs removal and then sends notifications
+            // to remaining members in a thread-safe manner.
             for (String chatroomName : joinedChatrooms) {
                 Chatroom room = chatRoomManager.getChatroom(chatroomName);
                 if (room != null) {
-                    room.removeMember(currentUser);
+                    boolean removedFromRoom = room.removeMemberWithNotify(currentUser);
+                    if (removedFromRoom) {
+                        System.out.println("Bruger " + currentUser + " fjernet fra chatrum ved disconnect: " + chatroomName);
+                    }
                 }
             }
         }
