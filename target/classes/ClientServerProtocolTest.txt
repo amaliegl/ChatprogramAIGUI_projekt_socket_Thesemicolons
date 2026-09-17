@@ -1,0 +1,15 @@
+Test steps:
+1. javac src/*.java
+2. Start server: java -cp src TcpServer
+3. In another terminal: java -cp src TcpClient
+
+Expected server output snippet:
+Klient forbundet: /127.0.0.1:...
+Modtaget fra klient: LOGIN|user1| -> Message[type=LOGIN,target=user1,payload=]
+Handling LOGIN: target=user1
+Bekræftelse sendt til klienten: 2026-09-12T19:19:00.326998700Z|ACK|server||Connected to chat server
+
+Expected client output snippet:
+Forbinder til localhost:5000
+Forbindelsen er oprettet
+Serverbesked: 2026-09-12T19:19:00.326998700Z|ACK|server||Connected to chat server

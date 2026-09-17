@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="da">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>PinkChat</title>
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Login Screen -->
+    <div id="login-screen" class="screen">
+        <div class="login-container">
+            <h1 class="title">PinkChat</h1>
+            <div class="input-group">
+                <input type="text" id="username-input" placeholder="Indtast brugernavn" maxlength="20">
+                <button id="login-btn" class="btn btn-primary">Forbind</button>
+            </div>
+            <div id="login-error" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- Main Chat Screen -->
+    <div id="chat-screen" class="screen hidden">
+        <div class="chat-container">
+            <!-- Header -->
+            <div class="header">
+                <h1 class="title">PinkChat</h1>
+                <div class="user-info">
+                    <span id="current-username"></span>
+                    <button id="logout-btn" class="btn btn-secondary">Log ud</button>
+                </div>
+            </div>
+
+            <!-- Main Content -->
+            <div class="main-content">
+                <!-- Chatrooms Sidebar -->
+                <div class="sidebar">
+                    <h2>Chatrum</h2>
+                    <div id="chatrooms-list" class="chatrooms-list"></div>
+                    <button id="join-room-btn" class="btn btn-secondary btn-full">+ Join chatrum</button>
+                    <button id="create-room-btn" class="btn btn-secondary btn-full">+ Opret chatrum</button>
+                </div>
+
+                <!-- Chat Area -->
+                <div class="chat-area">
+                    <div class="chat-header">
+                        <h2 id="current-room-name">Vælg et chatrum</h2>
+                    </div>
+                    <div id="messages-container" class="messages-container"></div>
+                    <div class="message-input-area">
+                        <input type="text" id="message-input" placeholder="Skriv en besked..." disabled>
+                        <button id="send-btn" class="btn btn-primary" disabled>Send</button>
+                    </div>
+                </div>
+
+                <!-- Participants Sidebar -->
+                <div class="sidebar">
+                    <h2>Deltagere</h2>
+                    <div id="participants-list" class="participants-list"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Join Room Modal -->
+    <div id="join-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Join chatrum</h2>
+            <input type="text" id="join-room-input" placeholder="Indtast chatrum navn" maxlength="20">
+            <div class="modal-buttons">
+                <button id="join-confirm-btn" class="btn btn-primary">Join</button>
+                <button id="join-cancel-btn" class="btn btn-secondary">Annuller</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Create Room Modal -->
+    <div id="create-modal" class="modal hidden">
+        <div class="modal-content">
+            <h2>Opret chatrum</h2>
+            <input type="text" id="create-room-input" placeholder="Indtast chatrum navn" maxlength="20">
+            <div class="modal-buttons">
+                <button id="create-confirm-btn" class="btn btn-primary">Opret</button>
+                <button id="create-cancel-btn" class="btn btn-secondary">Annuller</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="chat.js"></script>
+</body>
+</html>

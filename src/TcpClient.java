@@ -7,8 +7,8 @@ import java.net.Socket;
 import java.nio.charset.StandardCharsets;
 
 public class TcpClient {
-    private static final String HOST = "localhost";
-    private static final int PORT = 5001;
+    private static final String HOST = "change to right ip";
+    private static final int PORT = 9999; //change to right port
 
     public static void main(String[] args) throws IOException {
         BufferedReader consoleReader = new BufferedReader(new InputStreamReader(System.in, StandardCharsets.UTF_8));

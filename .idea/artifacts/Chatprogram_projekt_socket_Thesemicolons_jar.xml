@@ -1,0 +1,8 @@
+<component name="ArtifactManager">
+  <artifact type="jar" name="Chatprogram_projekt_socket_Thesemicolons:jar">
+    <output-path>$PROJECT_DIR$/out/artifacts/Chatprogram_projekt_socket_Thesemicolons_jar</output-path>
+    <root id="archive" name="Chatprogram_projekt_socket_Thesemicolons.jar">
+      <element id="module-output" name="Chatprogram_projekt_socket_Thesemicolons" />
+    </root>
+  </artifact>
+</component>

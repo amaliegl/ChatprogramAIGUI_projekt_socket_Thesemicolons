@@ -11,7 +11,7 @@ import java.util.concurrent.TimeUnit;
  * This keeps the accept-loop lightweight and allows controlled concurrency.
  */
 public class TcpServer {
-    private static final int DEFAULT_PORT = 5001;
+    private static final int DEFAULT_PORT = 5000;
     private static final int DEFAULT_POOL_SIZE = 20; // configurable via env THREAD_POOL_SIZE
 
     public static void main(String[] args) {
