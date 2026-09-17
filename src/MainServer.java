@@ -11,8 +11,8 @@ public class MainServer {
     private static final String WEB_ROOT = "src/presentation/web";
     
     // External TCP server configuration
-    private static final String EXTERNAL_SERVER_HOST = "Change to rigt ip"; // Change to external server IP
-    private static final int EXTERNAL_SERVER_PORT = 9999; // Change to external server port
+    private static final String EXTERNAL_SERVER_HOST = "localhost"; // Change to external server IP
+    private static final int EXTERNAL_SERVER_PORT = 5003; // Change to external server port
 
     private StaticFileServer httpServer;
     private ChatWebSocketServer webSocketServer;
